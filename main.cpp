@@ -6,7 +6,7 @@ using namespace std;
 int main(int argc, char const *argv[])
 {
 	Parser *parser = new Parser();
-	parser->LerArquivo(); //é referenciado dessa forma pq parser é um ponteiro
+	parser->CreateInvertedIndex(); //é referenciado dessa forma pq parser é um ponteiro
 
 	delete parser;
 
