@@ -20,24 +20,29 @@ int VerifyTag(string tag){
 	}
 }
 
-unordered_map<string, string> ReadFileContent(){
+unordered_map<double, string> ReadFileContent(string file_name){
 /*Essa função ler o arquivo e extrai o conteúdo dos campos do
 texto que serão indexados para compor o índice invertido*/
 
-	ifstream arq;
-	arq.open("cfc/cf76");
+	ifstream arq(file_name.c_str());
+
+	if (!arq.is_open()) {
+		cout << "erro ao abrir arquivo " << arq << endl;
+		//return NULL;
+	}
 
 	int flag_tag;
-	string tag, line, NUM_DOC;
+	string tag, line;
+	double NUM_DOC;
 	string doc_content;
-	unordered_map<string, string> buffer;
+	unordered_map<double, string> buffer;
 
 	while(getline(arq, line)){
 
 		tag = line.substr(0, 2); //retorna os dois primeiros caracteres da linha
 
 		if(tag == "RN"){
-			NUM_DOC = line.substr(3);
+			NUM_DOC = atof(line.substr(3).c_str());
 			doc_content = "";
 		}else if (VerifyTag(tag) == 1){
 			doc_content.append(line.substr(3)); //substr: pega a linha do caracter da posição 3 até o final da linha
@@ -58,7 +63,7 @@ texto que serão indexados para compor o índice invertido*/
 			buffer[NUM_DOC] = doc_content;
 	}
 
-	//unordered_map<string, string>::iterator iti = buffer.begin();
+	// unordered_map<string, string>::iterator iti = buffer.begin();
 
 	// for (iti; iti != buffer.end(); iti++){
 	// 	cout << iti->first << ": " << iti->second << endl;
@@ -87,13 +92,13 @@ bool IsCaracter(char c) {
 	case ':':
 	case '%':
 	case '+':
-	case '-':
 	case '<':
 	case '>':
 	case '=':
 	case '&':
 	case '?':
 	case '/':
+	case '-':
 	case '$':
 	case '#':
 	case '\\':
@@ -138,70 +143,134 @@ vector<string> CleanDocument(vector<string> terms){
 	return terms_clean;
 }
 
-unordered_map<string, InvertedList> Parser::CreateInvertedIndex(){
+void Parser::IndexDocument(double id_doc, vector<string> terms_clean){
+
+	InvertedList inverted_list;
+	InvertedList list_aux;
+	ListCell cell;
+	ListCell cell_aux;
+
+	vector<string>::iterator it_term; //para percorrer os termos de cada documento
+	unordered_map<string, InvertedList>::iterator it_hash;//para percorrer o hash
+	unordered_map<double,ListCell>::iterator it_cell;
+
+//preenche o hash com os termos e cria suas listas invertidas
+	for (it_term = terms_clean.begin(); it_term != terms_clean.end(); ++it_term) {
+		inverted_list.total_docs = 0;
+		list_aux.total_docs = 0;
+		cell.tf = 0;
+		cell_aux.tf = 0;
+		inverted_list.idf = 0;
+		list_aux.idf = 0;
+		cell.weight = 0;
+		cell_aux.weight = 0;			
+
+		if (inverted_index.find(*it_term) == inverted_index.end()) {//o termo não existe no hash
+			//caso o termo não exista no hash, insere no hash e incrementa a frequencia e o total de docs em que o termo aparece
+			inverted_list.total_docs = 1;
+			cell.tf = 1;
+			inverted_list.idf = log2(NUM_TOTAL_COLECAO/inverted_list.total_docs);
+			cell.weight = cell.tf * inverted_list.idf;
+			inverted_list.lista[id_doc] = cell;
+			inverted_index[*it_term] = inverted_list;
+
+			//cout << *it_term << ":" << id_doc << endl;
+
+		}else{ //o termo já existe no hash
+			it_hash = inverted_index.find(*it_term); //pega posição onde se encontra o termo
+			list_aux = (*it_hash).second; //pega lista invertida do termo				
+			
+			if (list_aux.lista.find(id_doc) == list_aux.lista.end()) //verifica se o documento já existe na lista invertida
+			{//se não tiver: insere uma nova celula na lista invertida com os valores correspondentes
+				list_aux.total_docs++;
+				cell.tf = 1;
+				list_aux.idf = log2(NUM_TOTAL_COLECAO/list_aux.total_docs);
+				cell.weight = cell.tf * list_aux.idf; 
+				list_aux.lista[id_doc] = cell;
+				//cout << *it_term << ":" << id_doc << endl;
+								 
+			}else{//se já tiver: só incrementa o tf e atualiza o peso e idf
+				it_cell = list_aux.lista.find(id_doc);
+				cell_aux = (*it_cell).second;
+				cell_aux.tf++;
+				//list_aux.idf = log2(NUM_TOTAL_COLECAO / list_aux.total_docs);
+				cell_aux.weight = cell_aux.tf * list_aux.idf;
+				list_aux.lista[id_doc] = cell_aux;
+				//cout << *it_term << ":" << id_doc << endl;		
+			}
+			inverted_index[*it_term] = list_aux;
+		}				
+	}
+
+}
+
+void Parser::PrintHash()
+{
+	unordered_map<string, InvertedList>::iterator iti;
+	unordered_map<double,ListCell>::iterator it_list;
+
+	for (iti = inverted_index.begin(); iti != inverted_index.end(); ++iti)
+	{
+		cout << iti->first << "-> " << "total de docs: " << iti->second.total_docs << "-> " << endl;
+
+		for (it_list = iti->second.lista.begin(); it_list != iti->second.lista.end(); ++it_list)
+		{
+			cout << it_list->first << ":" << it_list->second.tf << " | " ;
+		}
+
+		cout << endl;
+	}
+}
+
+
+void Parser::CreateInvertedIndex(string file_name){
 
 	string doc_content;
-	unordered_map<string, string> buffer;
+	unordered_map<double, string> buffer;
 	vector<string> terms, terms_clean;
-	unordered_map<string, vector<string>> documents;
-	
-	unordered_map<string, InvertedList> inverted_index; //hash do indice invertido
-	InvertedList inverted_list;
-	ListCell cell;
 
-	buffer = ReadFileContent(); //recebe o map com o conteúdo de todos os documentos
+	buffer = ReadFileContent(file_name); //recebe o map com o conteúdo de todos os documentos
 
-	unordered_map<string,string>::iterator it = buffer.begin();
+	unordered_map<double,string>::iterator it = buffer.begin();
 
 	for(it; it != buffer.end(); it++) // esse loop pega todo o conteúdo e separa em termos preenchendo o vetor de termos
 	{
+		double id_doc = it->first;
+
 		doc_content = it->second;
 		istringstream iss(doc_content);
 		copy(istream_iterator<string>(iss), istream_iterator<string>(), // função split
 			back_inserter<vector<string> >(terms));
 
 		terms_clean = CleanDocument(terms); //retira as palavras que são stopwords, caractere especiais e digitos
-		documents[it->first] = terms_clean; //preenche o hash com os ids dos documentos (RN)
-									  //com seus respectivos termos limpos
+		IndexDocument(id_doc, terms_clean);//indexa documento
+		terms.clear();
+		terms_clean.clear();
 	}
 
-	unordered_map<string, vector<string>>::iterator iti;//pra percorrer os documentos
-	vector<string>::iterator it_term; //para percorrer os termos de cada documento
-	unordered_map<string, InvertedList>::iterator it_hash;//para percorrer o hash
+	// unordered_map<string, vector<string>>::iterator d = documents.begin();
+	// vector<string>::iterator v;
 
-
-	//preenche o hash com os termos e cria suas listas invertidas
-	for (iti = documents.begin(); iti != documents.end(); iti++){
-
-		for (it_term = iti->second.begin(); it_term != iti->second.end(); ++it_term) {
-			cell.id_doc = iti->first;
-
-			if (inverted_index.find(*it_term) == inverted_index.end()) {//o termo não existe no hash
-				//caso o termo não exista no hash, insere no hash e incrementa a frequencia e o total de docs em que o termo aparece
-				inverted_list.total_docs = 1;
-				cell.tf = 1;
-				inverted_list.idf = log2(NUM_TOTAL_COLECAO/inverted_list.total_docs);
-				cell.weight = cell.tf*inverted_list.idf;
-				inverted_list.lista.push(cell);
-				inverted_index[*it_term] = inverted_list;
-			}else{ //o termo já existe no hash
-				it_hash = inverted_index.find(*it_term); //pega posição onde se encontra o termo
-				InvertedList list_aux = (*it_hash).second; //pega lista invertida do termo
-				ListCell cell_aux = list_aux.lista.top(); //pega o primeiro valor da lista/pilha
-				if (cell_aux.id_doc == iti->first) //verifica se o documento já existe na lista invertida
-				{//se já tiver: só incrementa o tf e atualiza o peso
-					cell_aux.tf++;
-					cell_aux.weight = cell_aux.tf * list_aux.idf;					 
-				}else{//e não tiver: insere uma nova celula na lista invertida com os valores correspondentes
-					list_aux.total_docs++;
-					cell.tf = 1;
-					list_aux.idf = log2(NUM_TOTAL_COLECAO/inverted_list.total_docs);
-					cell_aux.weight = cell.tf * list_aux.idf; 
-					list_aux.lista.push(cell);					
-				}
-			}				
-		}
-	}
-
-	return inverted_index;
+	// for (d; d != documents.end(); ++d)
+	// {
+	// 	cout << d->first << "-> ";
+	// 	for (v = d->second.begin(); v != d->second.end(); ++v)
+	// 	{
+	// 		cout << *v << ", ";
+	// 	}
+	// 	cout <<  endl;
+	// }
 }
+
+void Parser::ReadColection(){
+	string file_name;
+
+	for (int i = 4; i < 10; ++i)
+	{
+		file_name = "./cfc/cf7";
+		file_name+= to_string(i);
+		CreateInvertedIndex(file_name);
+		//cout << file_name << endl;
+	}
+}
+

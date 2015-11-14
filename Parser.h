@@ -9,23 +9,22 @@
 #include <iterator>
 #include <unordered_map>
 #include <algorithm>
-#include <stack>
+#include <list>
 #define NUM_TOTAL_COLECAO 1239
 
 using namespace std;
 
 struct ListCell
 {
-	string id_doc; //numero do documento
 	int tf; //frequencia que o termo ocorre no documento
-	double weight;
+	double weight; //peso do termo no documento
 };
 
-struct InvertedList
-{ // lista invertida
+struct InvertedList // lista invertida
+{ 
 	double idf; //importância do termo na coleção
 	int total_docs;
-	stack <ListCell> lista;
+	unordered_map<double,ListCell> lista;
 };
 
 class Parser
@@ -34,10 +33,12 @@ public:
 	Parser(); //construtor da classe
 	~Parser(); //destrutor da classe
 	//vector<string> CleanDocument(vector<string> terms);
-	unordered_map<string, InvertedList> CreateInvertedIndex();
+	void PrintHash();
+	void IndexDocument(double id_doc, vector<string> terms_clean);
+	void CreateInvertedIndex(string file_name);
+	void ReadColection();
 private:
-
+	unordered_map<string, InvertedList> inverted_index; //hash do indice invertido
 };
-
 
 #endif

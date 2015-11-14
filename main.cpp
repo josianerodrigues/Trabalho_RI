@@ -6,7 +6,8 @@ using namespace std;
 int main(int argc, char const *argv[])
 {
 	Parser *parser = new Parser();
-	parser->CreateInvertedIndex(); //é referenciado dessa forma pq parser é um ponteiro
+	parser->ReadColection(); //é referenciado dessa forma pq parser é um ponteiro
+	parser->PrintHash();
 
 	delete parser;
 
